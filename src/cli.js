@@ -1,147 +1,120 @@
 #!/usr/bin/env node
+/**
+ * palette-extract CLI entry point
+ */
+const fs = require('fs');
+const path = require('path');
+const { extractPalette } = require('./quantize');
+const { exportPalette, FORMATS } = require('./exporters/index');
 
 /**
- * palette-extract CLI
- * Main entry point for the command-line interface.
- * Parses arguments, loads an image, extracts a palette, and exports tokens.
+ * Convert raw pixel buffer (RGBA) to array of [r, g, b] triples
+ * @param {Buffer|Uint8Array} buffer
+ * @returns {number[][]}
  */
-
-import { createReadStream, existsSync } from 'fs';
-import { extname, resolve } from 'path';
-import { parseArgs } from 'util';
-import { extractPalette } from './quantize.js';
-import { exportPalette } from './exporters/index.js';
-import { createCanvas, loadImage } from 'canvas';
-
-const SUPPORTED_FORMATS = ['css', 'scss', 'scss-map', 'json', 'w3c'];
-const DEFAULT_COLORS = 6;
-const DEFAULT_FORMAT = 'css';
-
-/**
- * Samples pixel data from an image file using node-canvas.
- * Returns a flat Uint8ClampedArray of RGBA values.
- *
- * @param {string} imagePath - Absolute path to the image file.
- * @returns {Promise<{ data: Uint8ClampedArray, width: number, height: number }>}
- */
-async function samplePixels(imagePath) {
-  const img = await loadImage(imagePath);
-  const canvas = createCanvas(img.width, img.height);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-  const imageData = ctx.getImageData(0, 0, img.width, img.height);
-  return { data: imageData.data, width: img.width, height: img.height };
-}
-
-/**
- * Converts raw RGBA pixel data into an array of [r, g, b] tuples,
- * skipping fully-transparent pixels.
- *
- * @param {Uint8ClampedArray} data
- * @returns {Array<[number, number, number]>}
- */
-function pixelsToRgb(data) {
+function pixelsToRgb(buffer) {
   const pixels = [];
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3];
-    if (alpha < 128) continue; // skip transparent
-    pixels.push([data[i], data[i + 1], data[i + 2]]);
+  for (let i = 0; i < buffer.length; i += 4) {
+    const a = buffer[i + 3];
+    if (a > 128) {
+      pixels.push([buffer[i], buffer[i + 1], buffer[i + 2]]);
+    }
   }
   return pixels;
 }
 
-/**
- * Prints usage information to stdout.
- */
 function printHelp() {
   console.log(`
-Usage: palette-extract <image> [options]
+palette-extract — extract dominant color palettes from images
 
-Arguments:
-  image                 Path to the source image (JPEG, PNG, WebP, GIF)
+Usage:
+  palette-extract <image> [options]
 
 Options:
-  -n, --colors <num>    Number of colors to extract (default: ${DEFAULT_COLORS})
-  -f, --format <fmt>    Output format: ${SUPPORTED_FORMATS.join(', ')} (default: ${DEFAULT_FORMAT})
-  -o, --output <file>   Write output to file instead of stdout
-  -h, --help            Show this help message
-  -v, --version         Show version
+  --colors, -c <n>       Number of colors to extract (default: 6)
+  --format, -f <fmt>     Output format (default: css)
+  --output, -o <file>    Write output to file instead of stdout
+  --swatch-width <n>     SVG swatch width in px (default: 100)
+  --swatch-height <n>    SVG swatch height in px (default: 100)
+  --no-labels            Hide hex labels in SVG output
+  --columns <n>          Columns for svg-grid format (default: 4)
+  --help, -h             Show this help message
+
+Supported formats:
+  ${FORMATS.join(', ')}
 
 Examples:
-  palette-extract hero.png
-  palette-extract logo.jpg --colors 8 --format scss
-  palette-extract photo.png --format w3c --output tokens.json
+  palette-extract photo.png --colors 8 --format css
+  palette-extract photo.png --format svg --output swatches.svg
+  palette-extract photo.png --format svg-grid --columns 3
+  palette-extract photo.png --format tailwind-json --output palette.json
 `);
 }
 
+function parseArgs(argv) {
+  const args = { colors: 6, format: 'css', output: null, image: null, options: {} };
+  let i = 0;
+  while (i < argv.length) {
+    const arg = argv[i];
+    if (arg === '--help' || arg === '-h') { printHelp(); process.exit(0); }
+    else if (arg === '--colors' || arg === '-c') { args.colors = parseInt(argv[++i], 10); }
+    else if (arg === '--format' || arg === '-f') { args.format = argv[++i]; }
+    else if (arg === '--output' || arg === '-o') { args.output = argv[++i]; }
+    else if (arg === '--swatch-width') { args.options.swatchWidth = parseInt(argv[++i], 10); }
+    else if (arg === '--swatch-height') { args.options.swatchHeight = parseInt(argv[++i], 10); }
+    else if (arg === '--no-labels') { args.options.showLabels = false; }
+    else if (arg === '--columns') { args.options.columns = parseInt(argv[++i], 10); }
+    else if (!arg.startsWith('-') && !args.image) { args.image = arg; }
+    i++;
+  }
+  return args;
+}
+
 async function main() {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      colors:  { type: 'string',  short: 'n', default: String(DEFAULT_COLORS) },
-      format:  { type: 'string',  short: 'f', default: DEFAULT_FORMAT },
-      output:  { type: 'string',  short: 'o' },
-      help:    { type: 'boolean', short: 'h', default: false },
-      version: { type: 'boolean', short: 'v', default: false },
-    },
-    allowPositionals: true,
-  });
+  const argv = process.argv.slice(2);
+  if (argv.length === 0) { printHelp(); process.exit(1); }
 
-  if (values.version) {
-    const { createRequire } = await import('module');
-    const require = createRequire(import.meta.url);
-    const { version } = require('../../package.json');
-    console.log(`palette-extract v${version}`);
-    process.exit(0);
-  }
+  const args = parseArgs(argv);
 
-  if (values.help || positionals.length === 0) {
-    printHelp();
-    process.exit(0);
-  }
-
-  const imagePath = resolve(positionals[0]);
-  if (!existsSync(imagePath)) {
-    console.error(`Error: File not found — ${imagePath}`);
+  if (!args.image) {
+    console.error('Error: No image file specified.');
     process.exit(1);
   }
 
-  const numColors = parseInt(values.colors, 10);
-  if (isNaN(numColors) || numColors < 1 || numColors > 64) {
-    console.error('Error: --colors must be an integer between 1 and 64.');
+  if (!fs.existsSync(args.image)) {
+    console.error(`Error: File not found: ${args.image}`);
     process.exit(1);
   }
 
-  const format = values.format.toLowerCase();
-  if (!SUPPORTED_FORMATS.includes(format)) {
-    console.error(`Error: Unknown format "${format}". Supported: ${SUPPORTED_FORMATS.join(', ')}`);
-    process.exit(1);
-  }
-
+  let pixels;
   try {
-    const { data } = await samplePixels(imagePath);
-    const pixels = pixelsToRgb(data);
-
-    if (pixels.length === 0) {
-      console.error('Error: No opaque pixels found in image.');
+    // Attempt to use jimp if available; otherwise expect raw RGBA buffer file
+    const Jimp = require('jimp');
+    const img = await Jimp.read(args.image);
+    pixels = pixelsToRgb(img.bitmap.data);
+  } catch (e) {
+    if (e.code === 'MODULE_NOT_FOUND') {
+      console.error('Error: Install "jimp" to decode images: npm install jimp');
       process.exit(1);
     }
-
-    const palette = extractPalette(pixels, numColors);
-    const output = exportPalette(palette, format);
-
-    if (values.output) {
-      const { writeFileSync } = await import('fs');
-      const outPath = resolve(values.output);
-      writeFileSync(outPath, output, 'utf8');
-      console.error(`Palette written to ${outPath}`);
-    } else {
-      process.stdout.write(output + '\n');
-    }
-  } catch (err) {
-    console.error(`Error: ${err.message}`);
+    console.error(`Error reading image: ${e.message}`);
     process.exit(1);
+  }
+
+  const palette = extractPalette(pixels, args.colors);
+  const output = exportPalette(palette, args.format, args.options);
+
+  if (args.output) {
+    fs.writeFileSync(args.output, output, 'utf8');
+    console.error(`Written to ${args.output}`);
+  } else {
+    process.stdout.write(output + '\n');
   }
 }
 
-main();
+main().catch(err => {
+  console.error('Unexpected error:', err.message);
+  process.exit(1);
+});
+
+module.exports = { pixelsToRgb, printHelp };

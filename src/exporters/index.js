@@ -1,16 +1,15 @@
 /**
- * Central exporter — routes palette to the requested format
+ * Central palette exporter — routes to format-specific exporters
  */
-
-const { exportCss, rgbToCss } = require('./css');
+const { exportCss } = require('./css');
 const { exportJson, exportW3cTokens } = require('./json');
 const { exportScss, exportScssMap } = require('./scss');
 const { exportFigmaTokens, exportFigmaStyles } = require('./figma');
 const { exportTailwindTheme, exportTailwindJson } = require('./tailwind');
+const { exportSvgSwatches, exportSvgGrid } = require('./svg');
 
 const FORMATS = [
   'css',
-  'css-vars',
   'json',
   'w3c',
   'scss',
@@ -19,43 +18,44 @@ const FORMATS = [
   'figma-styles',
   'tailwind',
   'tailwind-json',
+  'svg',
+  'svg-grid',
 ];
 
 /**
- * Export a palette to the given format string.
- * @param {number[][]} palette - array of [r, g, b]
- * @param {string} format
- * @param {object} [options]
- * @param {string} [options.colorName] - base name for color tokens
- * @returns {string}
+ * Export a palette to the requested format string
+ * @param {number[][]} palette - Array of [r, g, b] colors
+ * @param {string} format - One of the supported format keys
+ * @param {object} options - Format-specific options
+ * @returns {string} Formatted output
  */
-function exportPalette(palette, format, options = {}) {
-  const { colorName = 'palette' } = options;
-
+function exportPalette(palette, format = 'css', options = {}) {
   switch (format) {
     case 'css':
-      return exportCss(palette);
-    case 'css-vars':
-      return palette.map((rgb, i) => `  --color-${i + 1}: ${rgbToCss(rgb)};`).join('\n');
+      return exportCss(palette, options);
     case 'json':
-      return exportJson(palette);
+      return exportJson(palette, options);
     case 'w3c':
-      return exportW3cTokens(palette);
+      return exportW3cTokens(palette, options);
     case 'scss':
-      return exportScss(palette);
+      return exportScss(palette, options);
     case 'scss-map':
-      return exportScssMap(palette);
+      return exportScssMap(palette, options);
     case 'figma':
-      return exportFigmaTokens(palette);
+      return exportFigmaTokens(palette, options);
     case 'figma-styles':
-      return exportFigmaStyles(palette);
+      return exportFigmaStyles(palette, options);
     case 'tailwind':
-      return exportTailwindTheme(palette, colorName);
+      return exportTailwindTheme(palette, options);
     case 'tailwind-json':
-      return exportTailwindJson(palette, colorName);
+      return exportTailwindJson(palette, options);
+    case 'svg':
+      return exportSvgSwatches(palette, options);
+    case 'svg-grid':
+      return exportSvgGrid(palette, options);
     default:
       throw new Error(
-        `Unknown format: "${format}". Supported formats: ${FORMATS.join(', ')}`
+        `Unknown format "${format}". Supported formats: ${FORMATS.join(', ')}`
       );
   }
 }

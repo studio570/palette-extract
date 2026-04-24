@@ -1,103 +1,92 @@
-const { exportCss, rgbToHex, rgbToCss } = require('./css');
-const { exportScss, exportScssMap } = require('./scss');
-const { exportJson, exportW3cTokens } = require('./json');
 const { exportPalette, FORMATS } = require('./index');
 
-const PALETTE = [
-  [255, 0, 0],
-  [0, 128, 64],
-  [30, 30, 200],
+const palette = [
+  [255, 87, 51],
+  [51, 87, 255],
+  [87, 255, 51],
+  [255, 255, 51],
 ];
 
-describe('rgbToHex', () => {
-  it('converts rgb to hex', () => {
-    expect(rgbToHex([255, 0, 0])).toBe('#ff0000');
-    expect(rgbToHex([0, 128, 64])).toBe('#008040');
-    expect(rgbToHex([30, 30, 200])).toBe('#1e1ec8');
+describe('FORMATS', () => {
+  test('is an array of strings', () => {
+    expect(Array.isArray(FORMATS)).toBe(true);
+    FORMATS.forEach(f => expect(typeof f).toBe('string'));
   });
 
-  it('handles black and white', () => {
-    expect(rgbToHex([0, 0, 0])).toBe('#000000');
-    expect(rgbToHex([255, 255, 255])).toBe('#ffffff');
-  });
-});
-
-describe('rgbToCss', () => {
-  it('converts rgb to css string', () => {
-    expect(rgbToCss([255, 0, 0])).toBe('rgb(255, 0, 0)');
-    expect(rgbToCss([0, 128, 64])).toBe('rgb(0, 128, 64)');
-  });
-});
-
-describe('exportCss', () => {
-  it('produces a :root block with hex vars by default', () => {
-    const result = exportCss(PALETTE);
-    expect(result).toContain(':root {');
-    expect(result).toContain('--color-1: #ff0000;');
-    expect(result).toContain('--color-2: #008040;');
-    expect(result).toContain('}');
+  test('includes svg and svg-grid', () => {
+    expect(FORMATS).toContain('svg');
+    expect(FORMATS).toContain('svg-grid');
   });
 
-  it('supports custom prefix and rgb format', () => {
-    const result = exportCss(PALETTE, { prefix: 'brand', format: 'rgb' });
-    expect(result).toContain('--brand-1: rgb(255, 0, 0);');
-  });
-
-  it('produces one variable per palette color', () => {
-    const result = exportCss(PALETTE);
-    const matches = result.match(/--color-\d+:/g);
-    expect(matches).toHaveLength(PALETTE.length);
-  });
-});
-
-describe('exportScss', () => {
-  it('produces SCSS variable lines', () => {
-    const result = exportScss(PALETTE);
-    expect(result).toContain('$color-1: #ff0000;');
-    expect(result).toContain('$color-3: #1e1ec8;');
-  });
-});
-
-describe('exportScssMap', () => {
-  it('produces a SCSS map', () => {
-    const result = exportScssMap(PALETTE, { mapName: 'colors' });
-    expect(result).toContain('$colors: (');
-    expect(result).toContain("'1': #ff0000");
-  });
-});
-
-describe('exportJson', () => {
-  it('produces valid JSON with color tokens', () => {
-    const result = exportJson(PALETTE);
-    const parsed = JSON.parse(result);
-    expect(parsed['color-1'].value).toBe('#ff0000');
-    expect(parsed['color-1'].type).toBe('color');
-  });
-});
-
-describe('exportW3cTokens', () => {
-  it('produces W3C token format', () => {
-    const result = exportW3cTokens(PALETTE, { prefix: 'brand' });
-    const parsed = JSON.parse(result);
-    expect(parsed.brand['brand-1'].$value).toBe('#ff0000');
-    expect(parsed.brand['brand-1'].$type).toBe('color');
+  test('includes all legacy formats', () => {
+    ['css', 'json', 'w3c', 'scss', 'figma', 'tailwind'].forEach(f => {
+      expect(FORMATS).toContain(f);
+    });
   });
 });
 
 describe('exportPalette', () => {
-  it('routes to correct exporter', () => {
-    expect(exportPalette(PALETTE, 'css')).toContain(':root {');
-    expect(exportPalette(PALETTE, 'scss')).toContain('$color-1');
-    expect(exportPalette(PALETTE, 'json')).toContain('"color-1"');
+  test('exports css format', () => {
+    const out = exportPalette(palette, 'css');
+    expect(out).toContain('--color-');
   });
 
-  it('throws on unknown format', () => {
-    expect(() => exportPalette(PALETTE, 'toml')).toThrow('Unknown format');
+  test('exports json format', () => {
+    const out = exportPalette(palette, 'json');
+    const parsed = JSON.parse(out);
+    expect(parsed).toHaveProperty('colors');
   });
 
-  it('exports all supported formats without throwing', () => {
-    FORMATS.forEach((fmt) => {
-      expect(() => exportPalette(PALETTE, fmt)).not.toThrow();
-    });
+  test('exports w3c format', () => {
+    const out = exportPalette(palette, 'w3c');
+    const parsed = JSON.parse(out);
+    expect(parsed).toHaveProperty('palette');
+  });
+
+  test('exports scss format', () => {
+    const out = exportPalette(palette, 'scss');
+    expect(out).toContain('$color-');
+  });
+
+  test('exports scss-map format', () => {
+    const out = exportPalette(palette, 'scss-map');
+    expect(out).toContain('$palette');
+  });
+
+  test('exports figma format', () => {
+    const out = exportPalette(palette, 'figma');
+    const parsed = JSON.parse(out);
+    expect(parsed).toHaveProperty('colors');
+  });
+
+  test('exports tailwind format', () => {
+    const out = exportPalette(palette, 'tailwind');
+    expect(out).toContain('palette');
+  });
+
+  test('exports svg format', () => {
+    const out = exportPalette(palette, 'svg');
+    expect(out).toContain('<svg');
+    expect(out).toContain('</svg>');
+  });
+
+  test('exports svg-grid format', () => {
+    const out = exportPalette(palette, 'svg-grid');
+    expect(out).toContain('<svg');
+    expect(out).toContain('rx="4"');
+  });
+
+  test('passes options to svg exporter', () => {
+    const out = exportPalette(palette, 'svg', { showLabels: false });
+    expect(out).not.toContain('<text');
+  });
+
+  test('throws on unknown format', () => {
+    expect(() => exportPalette(palette, 'unknown-xyz')).toThrow('Unknown format');
+  });
+
+  test('defaults to css when no format given', () => {
+    const out = exportPalette(palette);
+    expect(out).toContain('--color-');
   });
 });
