@@ -15,6 +15,11 @@ describe('rgbToHex', () => {
     expect(rgbToHex([0, 128, 64])).toBe('#008040');
     expect(rgbToHex([30, 30, 200])).toBe('#1e1ec8');
   });
+
+  it('handles black and white', () => {
+    expect(rgbToHex([0, 0, 0])).toBe('#000000');
+    expect(rgbToHex([255, 255, 255])).toBe('#ffffff');
+  });
 });
 
 describe('rgbToCss', () => {
@@ -36,6 +41,12 @@ describe('exportCss', () => {
   it('supports custom prefix and rgb format', () => {
     const result = exportCss(PALETTE, { prefix: 'brand', format: 'rgb' });
     expect(result).toContain('--brand-1: rgb(255, 0, 0);');
+  });
+
+  it('produces one variable per palette color', () => {
+    const result = exportCss(PALETTE);
+    const matches = result.match(/--color-\d+:/g);
+    expect(matches).toHaveLength(PALETTE.length);
   });
 });
 
