@@ -1,0 +1,13 @@
+node_modules/
+
+.env.local
+.parcel-cache/
+*.log
+npm-debug.log*
+.env
+.next/
+dist/
+*.swp
+Thumbs.db
+.cache/
+build/
