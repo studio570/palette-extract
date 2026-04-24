@@ -1,38 +1,52 @@
-/**
- * Unified exporter interface for palette-extract
- * Supports: css, scss, json, w3c
- */
-
-const { exportCss } = require('./css');
-const { exportScss, exportScssMap } = require('./scss');
+const { exportCss, rgbToHex } = require('./css');
 const { exportJson, exportW3cTokens } = require('./json');
-
-const FORMATS = ['css', 'scss', 'scss-map', 'json', 'w3c'];
+const { exportScss, exportScssMap } = require('./scss');
+const { exportFigmaTokens, exportFigmaStyles } = require('./figma');
 
 /**
- * Export a palette to the specified format string
- * @param {number[][]} palette - array of [r,g,b] colors
- * @param {string} format - one of FORMATS
- * @param {object} options - passed through to the specific exporter
- * @returns {string} formatted output
+ * Export a palette in the specified format
+ * @param {number[][]} palette - array of [r, g, b] colors
+ * @param {string} format - output format identifier
+ * @param {object} [options] - format-specific options
+ * @returns {string} formatted output string
  */
 function exportPalette(palette, format, options = {}) {
   switch (format) {
     case 'css':
-      return exportCss(palette, options);
-    case 'scss':
-      return exportScss(palette, options);
-    case 'scss-map':
-      return exportScssMap(palette, options);
+      return exportCss(palette);
+    case 'css-hex':
+      return exportCss(palette, { hex: true });
     case 'json':
-      return exportJson(palette, options);
+      return exportJson(palette);
     case 'w3c':
-      return exportW3cTokens(palette, options);
+      return exportW3cTokens(palette);
+    case 'scss':
+      return exportScss(palette);
+    case 'scss-map':
+      return exportScssMap(palette);
+    case 'figma':
+      return exportFigmaTokens(palette, options.collectionName);
+    case 'figma-styles':
+      return exportFigmaStyles(palette);
     default:
       throw new Error(
-        `Unknown format "${format}". Supported formats: ${FORMATS.join(', ')}`
+        `Unknown format: "${format}". Supported formats: css, css-hex, json, w3c, scss, scss-map, figma, figma-styles`
       );
   }
 }
 
-module.exports = { exportPalette, FORMATS };
+/**
+ * List of all supported export format identifiers
+ */
+const SUPPORTED_FORMATS = [
+  'css',
+  'css-hex',
+  'json',
+  'w3c',
+  'scss',
+  'scss-map',
+  'figma',
+  'figma-styles',
+];
+
+module.exports = { exportPalette, SUPPORTED_FORMATS, rgbToHex };
