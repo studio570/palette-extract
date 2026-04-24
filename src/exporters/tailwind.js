@@ -1,66 +1,58 @@
 /**
- * Tailwind CSS config exporter
- * Exports color palettes as Tailwind CSS theme configuration
+ * Tailwind CSS exporter
+ * Generates Tailwind-compatible color palette configurations
  */
 
 /**
  * Convert RGB array to hex string
- * @param {number[]} rgb - [r, g, b]
- * @returns {string}
+ * @param {number[]} rgb - [r, g, b] values (0-255)
+ * @returns {string} Hex color string (e.g. '#a3b4c5')
  */
-function rgbToHex(rgb) {
-  return (
-    '#' +
-    rgb
-      .map((c) => Math.round(c).toString(16).padStart(2, '0'))
-      .join('')
-  );
+function rgbToHex([r, g, b]) {
+  return '#' + [r, g, b]
+    .map(v => Math.round(v).toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
- * Export palette as a Tailwind CSS theme colors object (JS module)
- * @param {number[][]} palette - array of [r, g, b]
- * @param {string} [colorName='palette'] - base color name in the theme
- * @returns {string}
+ * Export palette as a Tailwind CSS theme colors object (JS format)
+ * Suitable for use inside tailwind.config.js
+ * @param {number[][]} palette - Array of [r, g, b] colors
+ * @param {string} [name='brand'] - Base name for the color scale
+ * @returns {string} JS string for Tailwind theme.colors
  */
-function exportTailwindTheme(palette, colorName = 'palette') {
-  const entries = palette
-    .map((rgb, i) => {
-      const shade = Math.round(((i + 1) / palette.length) * 900 / 100) * 100 || 50;
-      const hex = rgbToHex(rgb);
-      return `      ${shade}: '${hex}'`;
-    })
-    .join(',\n');
-
-  return (
-    `/** @type {import('tailwindcss').Config} */\n` +
-    `module.exports = {\n` +
-    `  theme: {\n` +
-    `    extend: {\n` +
-    `      colors: {\n` +
-    `        ${colorName}: {\n` +
-    `${entries}\n` +
-    `        }\n` +
-    `      }\n` +
-    `    }\n` +
-    `  }\n` +
-    `};\n`
-  );
-}
-
-/**
- * Export palette as a flat Tailwind-compatible colors object (JSON)
- * @param {number[][]} palette
- * @param {string} [colorName='palette']
- * @returns {string}
- */
-function exportTailwindJson(palette, colorName = 'palette') {
-  const shades = {};
-  palette.forEach((rgb, i) => {
-    const shade = Math.round(((i + 1) / palette.length) * 900 / 100) * 100 || 50;
-    shades[shade] = rgbToHex(rgb);
+function exportTailwindTheme(palette, name = 'brand') {
+  const entries = palette.map((color, i) => {
+    const stop = i === 0 ? 50 : i * 100;
+    return `    ${stop}: '${rgbToHex(color)}'`;
   });
-  return JSON.stringify({ colors: { [colorName]: shades } }, null, 2) + '\n';
+
+  return [
+    `// tailwind.config.js — paste into theme.extend.colors`,
+    `const colors = {`,
+    `  ${name}: {`,
+    ...entries,
+    `  }`,
+    `};`,
+    ``,
+    `module.exports = { theme: { extend: { colors } } };`,
+  ].join('\n');
+}
+
+/**
+ * Export palette as a plain JSON object with Tailwind-style numeric keys
+ * @param {number[][]} palette - Array of [r, g, b] colors
+ * @param {string} [name='brand'] - Base name for the color scale
+ * @returns {string} JSON string
+ */
+function exportTailwindJson(palette, name = 'brand') {
+  const scale = {};
+  palette.forEach((color, i) => {
+    const stop = i === 0 ? 50 : i * 100;
+    scale[stop] = rgbToHex(color);
+  });
+
+  return JSON.stringify({ [name]: scale }, null, 2);
 }
 
 module.exports = { rgbToHex, exportTailwindTheme, exportTailwindJson };
