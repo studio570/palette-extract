@@ -1,65 +1,60 @@
 /**
- * Unified palette exporter — routes to format-specific exporters
+ * Exporters index — annotates a palette and dispatches to format exporters
  */
 
-const { exportCss, rgbToHex } = require('./css');
-const { exportJson, exportW3cTokens } = require('./json');
-const { exportScss, exportScssMap } = require('./scss');
-const { exportFigmaTokens, exportFigmaStyles } = require('./figma');
-const { exportTailwindTheme, exportTailwindJson } = require('./tailwind');
-const { exportSvgSwatches, exportSvgGrid } = require('./svg');
-const { exportAse } = require('./ase');
-
-const FORMATS = [
-  'css', 'css-vars',
-  'json', 'w3c',
-  'scss', 'scss-map',
-  'figma', 'figma-styles',
-  'tailwind', 'tailwind-json',
-  'svg', 'svg-grid',
-  'ase',
-];
+const { exportCss } = require("./css");
+const { exportJson, exportW3cTokens } = require("./json");
+const { exportScss, exportScssMap } = require("./scss");
+const { exportFigmaTokens, exportFigmaStyles } = require("./figma");
+const { exportTailwindTheme, exportTailwindJson } = require("./tailwind");
+const { exportSvgSwatches, exportSvgGrid } = require("./svg");
+const { exportSketchPalette, exportSketchSwatches } = require("./sketchpalette");
 
 /**
- * Annotate palette entries with hex names for exporters that need them
+ * Annotate a raw palette (array of RGB arrays) with generated names
+ * @param {number[][]} palette - array of [r, g, b]
+ * @returns {Array<{name: string, rgb: number[]}>}
  */
 function annotatePalette(palette) {
-  return palette.map((color, i) => ({
-    ...color,
-    name: color.name || `color-${i + 1}`,
-    hex: rgbToHex(color.r, color.g, color.b),
+  return palette.map((rgb, i) => ({
+    name: `color-${i + 1}`,
+    rgb,
   }));
 }
 
 /**
- * Export a palette to the specified format.
- * @param {Array<{r,g,b}>} palette
+ * Export an annotated palette to the specified format
+ * @param {Array<{name: string, rgb: number[]}>} annotatedPalette
  * @param {string} format
  * @param {object} [options]
- * @returns {string|Buffer}
+ * @returns {string | Buffer}
  */
-function exportPalette(palette, format, options = {}) {
-  const annotated = annotatePalette(palette);
-
+function exportPalette(annotatedPalette, format, options = {}) {
   switch (format) {
-    case 'css':          return exportCss(annotated, options);
-    case 'css-vars':     return exportCss(annotated, { ...options, vars: true });
-    case 'json':         return exportJson(annotated, options);
-    case 'w3c':          return exportW3cTokens(annotated, options);
-    case 'scss':         return exportScss(annotated, options);
-    case 'scss-map':     return exportScssMap(annotated, options);
-    case 'figma':        return exportFigmaTokens(annotated, options);
-    case 'figma-styles': return exportFigmaStyles(annotated, options);
-    case 'tailwind':     return exportTailwindTheme(annotated, options);
-    case 'tailwind-json':return exportTailwindJson(annotated, options);
-    case 'svg':          return exportSvgSwatches(annotated, options);
-    case 'svg-grid':     return exportSvgGrid(annotated, options);
-    case 'ase':          return exportAse(annotated, options.groupName);
+    case "css":           return exportCss(annotatedPalette);
+    case "json":          return exportJson(annotatedPalette);
+    case "w3c":           return exportW3cTokens(annotatedPalette);
+    case "scss":          return exportScss(annotatedPalette);
+    case "scss-map":      return exportScssMap(annotatedPalette);
+    case "figma":         return exportFigmaTokens(annotatedPalette);
+    case "figma-styles":  return exportFigmaStyles(annotatedPalette);
+    case "tailwind":      return exportTailwindTheme(annotatedPalette, options.name);
+    case "tailwind-json": return exportTailwindJson(annotatedPalette, options.name);
+    case "svg":           return exportSvgSwatches(annotatedPalette);
+    case "svg-grid":      return exportSvgGrid(annotatedPalette);
+    case "sketch":        return exportSketchPalette(annotatedPalette);
+    case "sketch-swatches": return exportSketchSwatches(annotatedPalette);
     default:
-      throw new Error(
-        `Unknown format: "${format}". Supported formats: ${FORMATS.join(', ')}`
-      );
+      throw new Error(`Unknown export format: "${format}"`); 
   }
 }
 
-module.exports = { exportPalette, FORMATS, annotatePalette };
+const SUPPORTED_FORMATS = [
+  "css", "json", "w3c", "scss", "scss-map",
+  "figma", "figma-styles",
+  "tailwind", "tailwind-json",
+  "svg", "svg-grid",
+  "sketch", "sketch-swatches",
+];
+
+module.exports = { annotatePalette, exportPalette, SUPPORTED_FORMATS };
