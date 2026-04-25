@@ -5,6 +5,16 @@
 const { rgbToHex, rgbToCss } = require('./css');
 
 /**
+ * Resolve a color value based on the format option
+ * @param {number[]} color - [r,g,b] color
+ * @param {string} format - 'hex' or 'rgb'
+ * @returns {string} formatted color string
+ */
+function resolveColorValue(color, format) {
+  return format === 'rgb' ? rgbToCss(color) : rgbToHex(color);
+}
+
+/**
  * Export palette as SCSS variable declarations
  * @param {number[][]} palette - array of [r,g,b] colors
  * @param {object} options
@@ -15,7 +25,7 @@ const { rgbToHex, rgbToCss } = require('./css');
 function exportScss(palette, { prefix = 'color', format = 'hex' } = {}) {
   return palette
     .map((color, i) => {
-      const value = format === 'rgb' ? rgbToCss(color) : rgbToHex(color);
+      const value = resolveColorValue(color, format);
       return `$${prefix}-${i + 1}: ${value};`;
     })
     .join('\n');
@@ -31,7 +41,7 @@ function exportScss(palette, { prefix = 'color', format = 'hex' } = {}) {
  */
 function exportScssMap(palette, { mapName = 'palette', format = 'hex' } = {}) {
   const entries = palette.map((color, i) => {
-    const value = format === 'rgb' ? rgbToCss(color) : rgbToHex(color);
+    const value = resolveColorValue(color, format);
     return `  '${i + 1}': ${value}`;
   });
   return `$${mapName}: (\n${entries.join(',\n')}\n);`;
